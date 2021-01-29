@@ -177,7 +177,7 @@ struct HFD0CandidateSelector {
       }
     }
 
-    if (TMath::Abs(trackPion.pt()) < TMath::Abs(cuts[pTBin][4]) || TMath::Abs(trackKaon.pt()) < TMath::Abs(cuts[pTBin][3])) {
+    if (trackPion.pt() < cuts[pTBin][4] || trackKaon.pt() < cuts[pTBin][3]) {
       return false; //cut on daughter pT
     }
     if (TMath::Abs(trackPion.dcaPrim0()) > cuts[pTBin][6] || TMath::Abs(trackKaon.dcaPrim0()) > cuts[pTBin][5]) {
@@ -324,11 +324,17 @@ struct HFD0CandidateSelector {
 
     for (auto& hfCandProng2 : hfCandProng2s) { //looping over 2 prong candidates
 
+      statusD0 = 0;
+      statusD0bar = 0;
+
+      if (!(hfCandProng2.hfflag() & 1 << D0ToPiK)) {
+        hfSelD0Candidate(statusD0, statusD0bar);
+        continue;
+      }
+
       auto trackPos = hfCandProng2.index0_as<aod::BigTracksPID>(); //positive daughter
       auto trackNeg = hfCandProng2.index1_as<aod::BigTracksPID>(); //negative daughter
 
-      statusD0 = 0;
-      statusD0bar = 0;
       topolD0 = true;
       topolD0bar = true;
       pidD0 = -1;

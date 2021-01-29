@@ -21,6 +21,7 @@
 #include "Framework/DispatchPolicy.h"
 #include "Framework/DispatchControl.h"
 #include "Framework/DanglingContext.h"
+#include "Framework/DriverClient.h"
 #include "Framework/EndOfStreamContext.h"
 #include "Framework/FairOptionsRetriever.h"
 #include "ConfigurationOptionsRetriever.h"
@@ -177,27 +178,6 @@ void on_socket_polled(uv_poll_t* poller, int status, int events)
   // We do nothing, all the logic for now stays in DataProcessingDevice::doRun()
 }
 
-namespace
-{
-template <typename T>
-std::string arrayPrinter(boost::property_tree::ptree const& tree)
-{
-  std::stringstream ss;
-  int size = tree.size();
-  int count = 0;
-  ss << variant_array_symbol<T>::symbol << "[";
-  for (auto& element : tree) {
-    ss << element.second.get_value<T>();
-    if (count < size - 1) {
-      ss << ",";
-    }
-    ++count;
-  }
-  ss << "]";
-  return ss.str();
-}
-} // namespace
-
 /// This  takes care  of initialising  the device  from its  specification. In
 /// particular it needs to:
 ///
@@ -251,7 +231,7 @@ void DataProcessingDevice::Init()
   for (auto& entry : configStore->store()) {
     std::stringstream ss;
     std::string str;
-    if (entry.second.size() != 0) {
+    if (entry.second.empty() == false) {
       boost::property_tree::json_parser::write_json(ss, entry.second, false);
       str = ss.str();
       str.pop_back(); //remove EoL
@@ -468,6 +448,7 @@ bool DataProcessingDevice::ConditionalRun()
   if (mState.loop) {
     ZoneScopedN("uv idle");
     TracyPlot("past activity", (int64_t)mWasActive);
+    mServiceRegistry.get<DriverClient>().flushPending();
     auto shouldNotWait = (mWasActive &&
                           (mDataProcessorContexes.at(0).state->streaming != StreamingState::Idle) && (mState.activeSignals.empty())) ||
                          (mDataProcessorContexes.at(0).state->streaming == StreamingState::EndOfStreaming);

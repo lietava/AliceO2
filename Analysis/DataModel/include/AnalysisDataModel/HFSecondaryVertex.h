@@ -155,7 +155,9 @@ DECLARE_SOA_COLUMN(FlagMCMatchRec, flagMCMatchRec, int8_t); // reconstruction le
 DECLARE_SOA_COLUMN(FlagMCMatchGen, flagMCMatchGen, int8_t); // generator level
 
 // mapping of decay types
-enum DecayType { D0ToPiK = 1 };
+enum DecayType { D0ToPiK = 0,
+                 JpsiToEE,
+                 N2ProngDecays }; //always keep N2ProngDecays at the end
 
 // functions for specific particles
 
@@ -202,6 +204,31 @@ auto CosThetaStarD0bar(const T& candidate)
 {
   return candidate.cosThetaStar(array{RecoDecay::getMassPDG(kKPlus), RecoDecay::getMassPDG(kPiPlus)}, RecoDecay::getMassPDG(421), 0);
 }
+
+// Jpsi → e+e-
+template <typename T>
+auto CtJpsi(const T& candidate)
+{
+  return candidate.ct(RecoDecay::getMassPDG(443));
+}
+
+template <typename T>
+auto YJpsi(const T& candidate)
+{
+  return candidate.y(RecoDecay::getMassPDG(443));
+}
+
+template <typename T>
+auto EJpsi(const T& candidate)
+{
+  return candidate.e(RecoDecay::getMassPDG(443));
+}
+
+template <typename T>
+auto InvMassJpsiToEE(const T& candidate)
+{
+  return candidate.m(array{RecoDecay::getMassPDG(kElectron), RecoDecay::getMassPDG(kElectron)});
+}
 } // namespace hf_cand_prong2
 
 // general columns
@@ -234,6 +261,7 @@ DECLARE_SOA_TABLE(HfCandProng2Base, "AOD", "HFCANDP2BASE",
                   hf_cand::ImpactParameter0, hf_cand::ImpactParameter1,
                   hf_cand::ErrorImpactParameter0, hf_cand::ErrorImpactParameter1,
                   hf_track_index::Index0Id, hf_track_index::Index1Id,
+                  hf_track_index::HFflag,
                   /* dynamic columns */
                   hf_cand_prong2::M<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
                   hf_cand_prong2::M2<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
@@ -288,8 +316,10 @@ DECLARE_SOA_COLUMN(FlagMCMatchRec, flagMCMatchRec, int8_t); // reconstruction le
 DECLARE_SOA_COLUMN(FlagMCMatchGen, flagMCMatchGen, int8_t); // generator level
 
 // mapping of decay types
-enum DecayType { DPlusToPiKPi = 1,
-                 LcToPKPi };
+enum DecayType { DPlusToPiKPi = 0,
+                 LcToPKPi,
+                 DsToPiKK,
+                 N3ProngDecays }; //always keep N3ProngDecays at the end
 
 // functions for specific particles
 
@@ -340,9 +370,15 @@ auto ELc(const T& candidate)
 }
 
 template <typename T>
-auto InvMassLc(const T& candidate)
+auto InvMassLcpKpi(const T& candidate)
 {
   return candidate.m(array{RecoDecay::getMassPDG(kProton), RecoDecay::getMassPDG(kKPlus), RecoDecay::getMassPDG(kPiPlus)});
+}
+
+template <typename T>
+auto InvMassLcpiKp(const T& candidate)
+{
+  return candidate.m(array{RecoDecay::getMassPDG(kPiPlus), RecoDecay::getMassPDG(kKPlus), RecoDecay::getMassPDG(kProton)});
 }
 } // namespace hf_cand_prong3
 
@@ -357,6 +393,7 @@ DECLARE_SOA_TABLE(HfCandProng3Base, "AOD", "HFCANDP3BASE",
                   hf_cand::ImpactParameter0, hf_cand::ImpactParameter1, hf_cand::ImpactParameter2,
                   hf_cand::ErrorImpactParameter0, hf_cand::ErrorImpactParameter1, hf_cand::ErrorImpactParameter2,
                   hf_track_index::Index0Id, hf_track_index::Index1Id, hf_track_index::Index2Id,
+                  hf_track_index::HFflag,
                   /* dynamic columns */
                   hf_cand_prong3::M<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2>,
                   hf_cand_prong3::M2<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2>,

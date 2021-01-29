@@ -71,8 +71,12 @@ int GPUReconstructionCPUBackend::runKernelBackend(krnlSetup& _xyz, const Args&..
   }
   unsigned int num = y.num == 0 || y.num == -1 ? 1 : y.num;
   for (unsigned int k = 0; k < num; k++) {
-    if (mProcessingSettings.ompKernels) {
-      GPUCA_OPENMP(parallel for num_threads(mProcessingSettings.ompThreads))
+    int ompThreads = mProcessingSettings.ompKernels ? (mProcessingSettings.ompKernels == 2 ? ((mProcessingSettings.ompThreads + mNestedLoopOmpFactor - 1) / mNestedLoopOmpFactor) : mProcessingSettings.ompThreads) : 1;
+    if (ompThreads > 1) {
+      if (mProcessingSettings.debugLevel >= 5) {
+        printf("Running %d ompThreads\n", ompThreads);
+      }
+      GPUCA_OPENMP(parallel for num_threads(ompThreads))
       for (unsigned int iB = 0; iB < x.nBlocks; iB++) {
         typename T::GPUSharedMemory smem;
         T::template Thread<I>(x.nBlocks, 1, iB, 0, smem, T::Processor(*mHostConstantMem)[y.start + k], args...);
@@ -288,8 +292,8 @@ int GPUReconstructionCPU::RunChains()
 void GPUReconstructionCPU::ResetDeviceProcessorTypes()
 {
   for (unsigned int i = 0; i < mProcessors.size(); i++) {
-    if (mProcessors[i].proc->mDeviceProcessor) {
-      mProcessors[i].proc->mDeviceProcessor->InitGPUProcessor(this, GPUProcessor::PROCESSOR_TYPE_DEVICE);
+    if (mProcessors[i].proc->mGPUProcessorType != GPUProcessor::PROCESSOR_TYPE_DEVICE && mProcessors[i].proc->mLinkedProcessor) {
+      mProcessors[i].proc->mLinkedProcessor->InitGPUProcessor(this, GPUProcessor::PROCESSOR_TYPE_DEVICE);
     }
   }
 }
@@ -304,7 +308,7 @@ int GPUReconstructionCPU::getOMPMaxThreads()
   return omp_get_max_threads();
 }
 
-static std::atomic_flag timerFlag; // TODO: Should be a class member not global, but cannot be moved to header due to ROOT limitation
+static std::atomic_flag timerFlag = ATOMIC_FLAG_INIT; // TODO: Should be a class member not global, but cannot be moved to header due to ROOT limitation
 
 GPUReconstructionCPU::timerMeta* GPUReconstructionCPU::insertTimer(unsigned int id, std::string&& name, int J, int num, int type, RecoStep step)
 {
@@ -319,6 +323,8 @@ GPUReconstructionCPU::timerMeta* GPUReconstructionCPU::insertTimer(unsigned int 
       name += std::to_string(J);
     }
     mTimers[id].reset(new timerMeta{std::unique_ptr<HighResTimer[]>{new HighResTimer[num]}, name, num, type, 1u, step, (size_t)0});
+  } else {
+    mTimers[id]->count++;
   }
   timerMeta* retVal = mTimers[id].get();
   timerFlag.clear();
@@ -343,4 +349,17 @@ unsigned int GPUReconstructionCPU::getNextTimerId()
 {
   static std::atomic<unsigned int> id{0};
   return id.fetch_add(1);
+}
+
+unsigned int GPUReconstructionCPU::SetAndGetNestedLoopOmpFactor(bool condition, unsigned int max)
+{
+  if (condition && mProcessingSettings.ompKernels != 1) {
+    mNestedLoopOmpFactor = mProcessingSettings.ompKernels == 2 ? std::min<unsigned int>(max, mProcessingSettings.ompThreads) : mProcessingSettings.ompThreads;
+  } else {
+    mNestedLoopOmpFactor = 1;
+  }
+  if (mProcessingSettings.debugLevel >= 5) {
+    printf("Running %d OMP threads in outer loop\n", mNestedLoopOmpFactor);
+  }
+  return mNestedLoopOmpFactor;
 }

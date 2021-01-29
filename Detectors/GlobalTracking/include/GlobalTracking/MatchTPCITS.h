@@ -30,6 +30,7 @@
 #include "DetectorsBase/Propagator.h"
 #include "ReconstructionDataFormats/Track.h"
 #include "ReconstructionDataFormats/TrackTPCITS.h"
+#include "ReconstructionDataFormats/GlobalTrackID.h"
 #include "MathUtils/Primitive2D.h"
 #include "CommonDataFormat/EvIndex.h"
 #include "CommonDataFormat/InteractionRecord.h"
@@ -45,6 +46,7 @@
 #include "DataFormatsTPC/ClusterNativeHelper.h"
 #include "ITSReconstruction/RecoGeomHelper.h"
 #include "TPCFastTransform.h"
+#include "GPUO2InterfaceRefit.h"
 #include "GlobalTracking/MatchTPCITSParams.h"
 #include "CommonDataFormat/FlatHisto2D.h"
 
@@ -405,6 +407,12 @@ class MatchTPCITS
     mTPCTrackClusIdx = inp;
   }
 
+  ///< set input TPC cluster sharing map
+  void setTPCClustersSharingMap(const gsl::span<const unsigned char> inp)
+  {
+    mTPCRefitterShMap = inp;
+  }
+
   ///< set input TPC clusters
   void setTPCClustersInp(const o2::tpc::ClusterNativeAccess* inp)
   {
@@ -484,7 +492,7 @@ class MatchTPCITS
 #endif
 
  private:
-  void updateTPCTimeDependentParams();
+  void updateTimeDependentParams();
 
   int findLaddersToCheckBOn(int ilr, int lad0, const o2::math_utils::CircleXYf_t& circle, float errYFrac,
                             std::array<int, MaxLadderCand>& lad2Check) const;
@@ -504,9 +512,8 @@ class MatchTPCITS
 
   void doMatching(int sec);
 
-  void refitWinners(bool loopInITS = false);
-  bool refitTrackTPCITSloopITS(int iITS, int& iTPC);
-  bool refitTrackTPCITSloopTPC(int iTPC, int& iITS);
+  void refitWinners();
+  bool refitTrackTPCITS(int iTPC, int& iITS);
   bool refitTPCInward(o2::track::TrackParCov& trcIn, float& chi2, float xTgt, int trcID, float timeTB) const;
 
   void selectBestMatches();
@@ -545,7 +552,7 @@ class MatchTPCITS
     }
     int rof = tbin > 0 ? tbin * mTPCBin2ITSROFrame : 0;
     // the rof is estimated continuous counter but the actual bins might have gaps (e.g. HB rejects etc)-> use mapping
-    return rof < mITSTrackROFContMapping.size() ? mITSTrackROFContMapping[rof] : mITSTrackROFContMapping.back();
+    return rof < int(mITSTrackROFContMapping.size()) ? mITSTrackROFContMapping[rof] : mITSTrackROFContMapping.back();
   }
 
   ///< convert ITS ROFrame to TPC time bin units // TOREMOVE
@@ -607,6 +614,7 @@ class MatchTPCITS
   bool mFieldON = true;    ///< flag for field ON/OFF
   bool mCosmics = false;   ///< flag cosmics mode
   bool mMCTruthON = false; ///< flag availability of MC truth
+  float mBz = 0;           ///< nominal Bz
 
   o2::InteractionRecord mStartIR{0, 0}; ///< IR corresponding to the start of the TF
 
@@ -641,6 +649,7 @@ class MatchTPCITS
   float mTPCBin2Z = 0.;             ///< conversion coeff from TPC time-bin to Z
   float mNTPCBinsFullDrift = 0.;    ///< max time bin for full drift
   float mTPCZMax = 0.;              ///< max drift length
+  float mTPCmeanX0Inv = 1. / 31850.; ///< TPC gas 1/X0
 
   float mMinTPCTrackPtInv = 999.; ///< cutoff on TPC track inverse pT
   float mMinITSTrackPtInv = 999.; ///< cutoff on ITS track inverse pT
@@ -650,6 +659,7 @@ class MatchTPCITS
 
   std::unique_ptr<TPCTransform> mTPCTransform;         ///< TPC cluster transformation
   std::unique_ptr<o2::gpu::GPUParam> mTPCClusterParam; ///< TPC clusters error param
+  std::unique_ptr<o2::gpu::GPUO2InterfaceRefit> mTPCRefitter; ///< TPC refitter used for TPC tracks refit during the reconstruction
 
   o2::BunchFilling mBunchFilling;
   std::array<int16_t, o2::constants::lhc::LHCMaxBunches> mClosestBunchAbove; // closest filled bunch from above
@@ -665,6 +675,8 @@ class MatchTPCITS
   gsl::span<const ITSCluster> mITSClustersArray;            ///< input ITS clusters span
   gsl::span<const o2::itsmft::ROFRecord> mITSClusterROFRec; ///< input ITS clusters ROFRecord span
   gsl::span<const o2::ft0::RecPoints> mFITInfo;             ///< optional input FIT info span
+
+  gsl::span<const unsigned char> mTPCRefitterShMap; ///< externally set TPC clusters sharing map
 
   const o2::tpc::ClusterNativeAccess* mTPCClusterIdxStruct = nullptr; ///< struct holding the TPC cluster indices
 

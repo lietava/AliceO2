@@ -249,15 +249,15 @@ Bool_t Detector::ProcessHits(FairVolume* v)
     int ixcell = (int)xcell;
     float zc = zcell - izcell - 0.5;
     float xc = xcell - ixcell - 0.5;
-    for (int iz = 1; iz <= cpvparam.mNgamz; iz++) {
+    for (int iz = 0; iz < cpvparam.mNgamz; iz++) {
       int kzg = izcell + iz - nz3;
-      if (kzg <= 0 || kzg > cpvparam.mnCellZ) {
+      if (kzg < 0 || kzg >= cpvparam.mnCellZ) {
         continue;
       }
       float zg = (float)(iz - nz3) - zc;
-      for (int ix = 1; ix <= cpvparam.mNgamx; ix++) {
+      for (int ix = 0; ix < cpvparam.mNgamx; ix++) {
         int kxg = ixcell + ix - nx3;
-        if (kxg <= 0 || kxg > cpvparam.mnCellX) {
+        if (kxg < 0 || kxg >= cpvparam.mnCellX) {
           continue;
         }
         float xg = (float)(ix - nx3) - xc;
@@ -351,11 +351,10 @@ void Detector::ConstructGeometry()
   // Configure geometry So far we have only one: Run3
   {
     mActiveModule[0] = kFALSE;
-    mActiveModule[1] = kTRUE;
+    mActiveModule[1] = kFALSE;
     mActiveModule[2] = kTRUE;
     mActiveModule[3] = kTRUE;
-    mActiveModule[4] = kFALSE;
-    mActiveModule[5] = kFALSE;
+    mActiveModule[4] = kTRUE;
   }
 
   // First create necessary materials
@@ -375,7 +374,7 @@ void Detector::ConstructGeometry()
   int iXYZ, iAngle;
   char im[5];
   for (int iModule = 0; iModule < 5; iModule++) {
-    if (!mActiveModule[iModule + 1]) {
+    if (!mActiveModule[iModule]) {
       continue;
     }
     float angle[3][2] = {0};
@@ -385,7 +384,7 @@ void Detector::ConstructGeometry()
     float pos[3] = {0};
     geomParams->GetModuleCenter(iModule, pos);
 
-    fMC->Gspos("CPV", iModule + 1, "barrel", pos[0], pos[1] + 30., pos[2], idrotm[iModule], "ONLY");
+    fMC->Gspos("CPV", iModule, "barrel", pos[0], pos[1] + 30., pos[2], idrotm[iModule], "ONLY");
   }
 
   //start filling CPV moodules
@@ -563,15 +562,18 @@ void Detector::addAlignableVolumes() const
 
   TString symbModuleName = "CPV/Module";
 
-  for (Int_t iModule = 1; iModule <= geom->GetNModules(); iModule++) {
+  for (Int_t iModule = 0; iModule < geom->GetNModules(); iModule++) {
 
+    if (!mActiveModule[iModule]) {
+      continue;
+    }
     TString volPath(physModulePath);
     volPath += iModule;
 
     TString symName(symbModuleName);
     symName += iModule;
 
-    int modUID = o2::base::GeometryManager::getSensID(idCPV, iModule - 1);
+    int modUID = o2::base::GeometryManager::getSensID(idCPV, iModule);
 
     LOG(DEBUG) << "--------------------------------------------"
                << "\n";

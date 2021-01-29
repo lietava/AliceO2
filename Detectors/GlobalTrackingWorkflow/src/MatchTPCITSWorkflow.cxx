@@ -14,6 +14,7 @@
 #include "ITSWorkflow/TrackReaderSpec.h"
 #include "TPCWorkflow/TrackReaderSpec.h"
 #include "TPCWorkflow/PublisherSpec.h"
+#include "TPCWorkflow/ClusterSharingMapSpec.h"
 #include "FT0Workflow/RecPointReaderSpec.h"
 #include "GlobalTrackingWorkflow/TPCITSMatchingSpec.h"
 #include "GlobalTrackingWorkflow/MatchTPCITSWorkflow.h"
@@ -44,6 +45,7 @@ framework::WorkflowSpec getMatchTPCITSWorkflow(bool useFT0, bool useMC, bool dis
     specs.emplace_back(o2::tpc::getTPCTrackReaderSpec(useMC));
     specs.emplace_back(o2::tpc::getPublisherSpec(o2::tpc::PublisherConf{
                                                    "tpc-native-cluster-reader",
+                                                   "tpc-native-clusters.root",
                                                    "tpcrec",
                                                    {"clusterbranch", "TPCClusterNative", "Branch with TPC native clusters"},
                                                    {"clustermcbranch", "TPCClusterNativeMCTruth", "MC label branch"},
@@ -52,11 +54,13 @@ framework::WorkflowSpec getMatchTPCITSWorkflow(bool useFT0, bool useMC, bool dis
                                                    tpcClusSectors,
                                                    tpcClusLanes},
                                                  useMC));
+    specs.emplace_back(o2::tpc::getClusterSharingMapSpec());
 
     if (useFT0) {
       specs.emplace_back(o2::ft0::getRecPointReaderSpec(useMC));
     }
   }
+
   specs.emplace_back(o2::globaltracking::getTPCITSMatchingSpec(useFT0, calib, useMC, tpcClusLanes));
 
   if (!disableRootOut) {

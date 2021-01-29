@@ -121,7 +121,8 @@ struct HFCandidateCreator3Prong {
                        pvec2[0], pvec2[1], pvec2[2],
                        impactParameter0.getY(), impactParameter1.getY(), impactParameter2.getY(),
                        std::sqrt(impactParameter0.getSigmaY2()), std::sqrt(impactParameter1.getSigmaY2()), std::sqrt(impactParameter2.getSigmaY2()),
-                       rowTrackIndexProng3.index0Id(), rowTrackIndexProng3.index1Id(), rowTrackIndexProng3.index2Id());
+                       rowTrackIndexProng3.index0Id(), rowTrackIndexProng3.index1Id(), rowTrackIndexProng3.index2Id(),
+                       rowTrackIndexProng3.hfflag());
 
       // fill histograms
       if (b_dovalplots) {
@@ -150,23 +151,27 @@ struct HFCandidateCreator3ProngMC {
                aod::McParticles const& particlesMC)
   {
     int8_t sign = 0;
-    int8_t result = 0;
+    int8_t result = N3ProngDecays;
 
     // Match reconstructed candidates.
     for (auto& candidate : candidates) {
       //Printf("New rec. candidate");
-      result = 0;
+      result = N3ProngDecays;
       auto arrayDaughters = array{candidate.index0_as<aod::BigTracksMC>(), candidate.index1_as<aod::BigTracksMC>(), candidate.index2_as<aod::BigTracksMC>()};
 
       // D± → π± K∓ π±
       //Printf("Checking D± → π± K∓ π±");
-      auto indexRecDPlus = RecoDecay::getMatchedMCRec(particlesMC, arrayDaughters, 411, array{+kPiPlus, -kKPlus, +kPiPlus}, true, &sign);
-      result += sign * DPlusToPiKPi * int8_t(indexRecDPlus > -1);
+      if (RecoDecay::getMatchedMCRec(particlesMC, arrayDaughters, 411, array{+kPiPlus, -kKPlus, +kPiPlus}, true, &sign) > -1) {
+        result = sign * DPlusToPiKPi;
+      }
 
       // Λc± → p± K∓ π±
-      //Printf("Checking Λc± → p± K∓ π±");
-      auto indexRecLc = RecoDecay::getMatchedMCRec(particlesMC, std::move(arrayDaughters), 4122, array{+kProton, -kKPlus, +kPiPlus}, true, &sign);
-      result += sign * LcToPKPi * int8_t(indexRecLc > -1);
+      if (result == N3ProngDecays) {
+        //Printf("Checking Λc± → p± K∓ π±");
+        if (RecoDecay::getMatchedMCRec(particlesMC, std::move(arrayDaughters), 4122, array{+kProton, -kKPlus, +kPiPlus}, true, &sign) > -1) {
+          result = sign * LcToPKPi;
+        }
+      }
 
       rowMCMatchRec(result);
     }
@@ -174,17 +179,21 @@ struct HFCandidateCreator3ProngMC {
     // Match generated particles.
     for (auto& particle : particlesMC) {
       //Printf("New gen. candidate");
-      result = 0;
+      result = N3ProngDecays;
 
       // D± → π± K∓ π±
       //Printf("Checking D± → π± K∓ π±");
-      auto isMatchedGenDPlus = RecoDecay::isMatchedMCGen(particlesMC, particle, 411, array{+kPiPlus, -kKPlus, +kPiPlus}, true, &sign);
-      result += sign * DPlusToPiKPi * int8_t(isMatchedGenDPlus);
+      if (RecoDecay::isMatchedMCGen(particlesMC, particle, 411, array{+kPiPlus, -kKPlus, +kPiPlus}, true, &sign)) {
+        result = sign * DPlusToPiKPi;
+      }
 
       // Λc± → p± K∓ π±
-      //Printf("Checking Λc± → p± K∓ π±");
-      auto isMatchedGenLc = RecoDecay::isMatchedMCGen(particlesMC, particle, 4122, array{+kProton, -kKPlus, +kPiPlus}, true, &sign);
-      result += sign * LcToPKPi * int8_t(isMatchedGenLc);
+      if (result == N3ProngDecays) {
+        //Printf("Checking Λc± → p± K∓ π±");
+        if (RecoDecay::isMatchedMCGen(particlesMC, particle, 4122, array{+kProton, -kKPlus, +kPiPlus}, true, &sign)) {
+          result = sign * LcToPKPi;
+        }
+      }
 
       rowMCMatchGen(result);
     }

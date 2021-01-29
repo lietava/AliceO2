@@ -187,9 +187,11 @@ class LookUpTable
     mgr.setURL("http://ccdb-test.cern.ch:8080");
     auto hvch = mgr.get<std::vector<o2::ft0::HVchannel>>("FT0/LookUpTable");
     size_t max = 0;
-    for (auto const& chan : *hvch)
-      if (max < chan.channel)
+    for (auto const& chan : *hvch) {
+      if (max < chan.channel) {
         max = chan.channel;
+      }
+    }
     lut_data.resize(max + 1);
     for (auto const& chan : *hvch) {
       o2::ft0::Topo topo = chan.pm;
@@ -213,6 +215,21 @@ class LookUpTable
   ClassDefNV(LookUpTable, 2);
 };
 
+//Singleton for LookUpTable
+class SingleLUT : public LookUpTable
+{
+ private:
+  SingleLUT() : LookUpTable(LookUpTable::readTable()) {}
+  SingleLUT(const SingleLUT&) = delete;
+  SingleLUT& operator=(SingleLUT&) = delete;
+
+ public:
+  static SingleLUT& Instance()
+  {
+    static SingleLUT instanceLUT;
+    return instanceLUT;
+  }
+};
 } // namespace ft0
 } // namespace o2
 #endif

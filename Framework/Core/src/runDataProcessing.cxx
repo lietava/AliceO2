@@ -15,14 +15,7 @@
 #include "Framework/ConfigContext.h"
 #include "Framework/DataProcessingDevice.h"
 #include "Framework/DataProcessorSpec.h"
-#if __has_include(<DebugGUI/DebugGUI.h>)
-#include <DebugGUI/DebugGUI.h>
-#else
-// the DebugGUI is in a separate package and is optional for O2,
-// we include a header implementing GUI interface dummy methods
-#pragma message "Building DPL without Debug GUI"
-#include "Framework/NoDebugGUI.h"
-#endif
+#include "Framework/Plugins.h"
 #include "Framework/DeviceControl.h"
 #include "Framework/DeviceExecution.h"
 #include "Framework/DeviceInfo.h"
@@ -30,7 +23,7 @@
 #include "Framework/DeviceConfigInfo.h"
 #include "Framework/DeviceSpec.h"
 #include "Framework/DeviceState.h"
-#include "Framework/FrameworkGUIDebugger.h"
+#include "Framework/DebugGUI.h"
 #include "Framework/LocalRootFileService.h"
 #include "Framework/LogParsingHelpers.h"
 #include "Framework/Logger.h"
@@ -39,19 +32,19 @@
 #include "Framework/SimpleRawDeviceService.h"
 #define O2_SIGNPOST_DEFINE_CONTEXT
 #include "Framework/Signpost.h"
-#include "Framework/TextControlService.h"
+#include "Framework/ControlService.h"
 #include "Framework/CallbackService.h"
 #include "Framework/WorkflowSpec.h"
 #include "Framework/Monitoring.h"
+#include "Framework/DataProcessorInfo.h"
+#include "Framework/DriverInfo.h"
+#include "Framework/DriverControl.h"
 
 #include "ComputingResourceHelpers.h"
 #include "DataProcessingStatus.h"
 #include "DDSConfigHelpers.h"
 #include "O2ControlHelpers.h"
 #include "DeviceSpecHelpers.h"
-#include "DriverControl.h"
-#include "DriverInfo.h"
-#include "DataProcessorInfo.h"
 #include "GraphvizHelpers.h"
 #include "PropertyTreeHelpers.h"
 #include "SimpleResourceManager.h"
@@ -585,6 +578,35 @@ struct LogProcessingState {
   bool hasNewMetric = false;
 };
 
+void processCommand(DeviceInfos& infos, pid_t pid, std::string const& command, std::string const& arg)
+{
+  auto doToMatchingPid = [](std::vector<DeviceInfo>& infos, pid_t pid, auto lambda) {
+    for (auto& deviceInfo : infos) {
+      if (deviceInfo.pid == pid) {
+        lambda(deviceInfo);
+        break;
+      }
+    }
+  };
+  LOGP(debug, "Found control command {} from pid {} with argument {}.", command, pid, arg);
+  if (command == "QUIT" && arg == "ALL") {
+    for (auto& deviceInfo : infos) {
+      deviceInfo.readyToQuit = true;
+    }
+  } else if (command == "QUIT" && arg == "ME") {
+    doToMatchingPid(infos, pid, [](DeviceInfo& info) { info.readyToQuit = true; });
+  } else if (command == "NOTIFY_STREAMING_STATE" && arg == "IDLE") {
+    // FIXME: this should really be a policy...
+    doToMatchingPid(infos, pid, [](DeviceInfo& info) { info.readyToQuit = true; info.streamingState = StreamingState::Idle; });
+  } else if (command == "NOTIFY_STREAMING_STATE" && arg == "STREAMING") {
+    // FIXME: this should really be a policy...
+    doToMatchingPid(infos, pid, [](DeviceInfo& info) { info.streamingState = StreamingState::Streaming; });
+  } else if (command == "NOTIFY_STREAMING_STATE" && arg == "EOS") {
+    // FIXME: this should really be a policy...
+    doToMatchingPid(infos, pid, [](DeviceInfo& info) { info.streamingState = StreamingState::EndOfStreaming; });
+  }
+};
+
 LogProcessingState processChildrenOutput(DriverInfo& driverInfo,
                                          DeviceInfos& infos,
                                          DeviceSpecs const& specs,
@@ -634,14 +656,6 @@ LogProcessingState processChildrenOutput(DriverInfo& driverInfo,
       hasNewMetric = true;
     };
 
-    auto doToMatchingPid = [&infos](int pid, auto lambda) {
-      for (auto& deviceInfo : infos) {
-        if (deviceInfo.pid == pid) {
-          lambda(deviceInfo);
-          break;
-        }
-      }
-    };
 
     while ((pos = s.find(delimiter)) != std::string::npos) {
       std::string token{s.substr(0, pos)};
@@ -658,25 +672,7 @@ LogProcessingState processChildrenOutput(DriverInfo& driverInfo,
         DeviceMetricsHelper::processMetric(metricMatch, metrics, newMetricCallback);
         result.didProcessMetric = true;
       } else if (logLevel == LogParsingHelpers::LogLevel::Info && parseControl(token, match)) {
-        auto command = match[1];
-        auto arg = match[2];
-        LOGP(debug, "Found control command {} from pid {} with argument {}.", command, info.pid, arg);
-        if (command == "QUIT" && arg == "ALL") {
-          for (auto& deviceInfo : infos) {
-            deviceInfo.readyToQuit = true;
-          }
-        } else if (command == "QUIT" && arg == "ME") {
-          doToMatchingPid(info.pid, [](DeviceInfo& info) { info.readyToQuit = true; });
-        } else if (command == "NOTIFY_STREAMING_STATE" && arg == "IDLE") {
-          // FIXME: this should really be a policy...
-          doToMatchingPid(info.pid, [](DeviceInfo& info) { info.readyToQuit = true; info.streamingState = StreamingState::Idle; });
-        } else if (command == "NOTIFY_STREAMING_STATE" && arg == "STREAMING") {
-          // FIXME: this should really be a policy...
-          doToMatchingPid(info.pid, [](DeviceInfo& info) { info.streamingState = StreamingState::Streaming; });
-        } else if (command == "NOTIFY_STREAMING_STATE" && arg == "EOS") {
-          // FIXME: this should really be a policy...
-          doToMatchingPid(info.pid, [](DeviceInfo& info) { info.streamingState = StreamingState::EndOfStreaming; });
-        }
+        processCommand(infos, info.pid, match[1].str(), match[2].str());
         result.didProcessControl = true;
       } else if (logLevel == LogParsingHelpers::LogLevel::Info && DeviceConfigHelper::parseConfig(token, configMatch)) {
         DeviceConfigHelper::processConfig(configMatch, info);
@@ -743,6 +739,32 @@ bool processSigChild(DeviceInfos& infos)
     }
   }
   return hasError;
+}
+
+void doDPLException(RuntimeErrorRef& e)
+{
+  auto& err = o2::framework::error_from_ref(e);
+  if (err.maxBacktrace != 0) {
+    LOG(ERROR) << "Unhandled o2::framework::runtime_error reached the top of main, device shutting down. Details follow: \n";
+    backtrace_symbols_fd(err.backtrace, err.maxBacktrace, STDERR_FILENO);
+  } else {
+    LOG(ERROR) << "Unhandled o2::framework::runtime_error reached the top of main, device shutting down."
+                  " Recompile with DPL_ENABLE_BACKTRACE=1 to get more information.";
+  }
+}
+
+void doUnknownException(std::string const& s)
+{
+  if (s.empty()) {
+    LOG(ERROR) << "Unknown error while setting up workflow.";
+  } else {
+    LOG(ERROR) << "error while setting up workflow: " << s;
+  }
+}
+
+void doDefaultWorkflowTerminationHook()
+{
+  //LOG(INFO) << "Process " << getpid() << " is exiting.";
 }
 
 int doChild(int argc, char** argv, ServiceRegistry& serviceRegistry, const o2::framework::DeviceSpec& spec, TerminationPolicy errorPolicy,
@@ -812,14 +834,7 @@ int doChild(int argc, char** argv, ServiceRegistry& serviceRegistry, const o2::f
                << boost::current_exception_diagnostic_information(true);
     return 1;
   } catch (o2::framework::RuntimeErrorRef e) {
-    auto& err = o2::framework::error_from_ref(e);
-    if (err.maxBacktrace != 0) {
-      LOG(ERROR) << "Unhandled o2::framework::runtime_error reached the top of main, device shutting down. Details follow: \n";
-      backtrace_symbols_fd(err.backtrace, err.maxBacktrace, STDERR_FILENO);
-    } else {
-      LOG(ERROR) << "Unhandled o2::framework::runtime_error reached the top of main, device shutting down."
-                    " Recompile with DPL_ENABLE_BACKTRACE=1 to get more information.";
-    }
+    doDPLException(e);
     return 1;
   } catch (std::exception& e) {
     LOG(ERROR) << "Unhandled std::exception reached the top of main: " << e.what() << ", device shutting down.";
@@ -841,6 +856,7 @@ struct GuiCallbackContext {
   uint64_t frameLast;
   float* frameLatency;
   float* frameCost;
+  DebugGUI* plugin;
   void* window;
   bool* guiQuitRequested;
   std::function<void(void)> callback;
@@ -849,9 +865,12 @@ struct GuiCallbackContext {
 void gui_callback(uv_timer_s* ctx)
 {
   GuiCallbackContext* gui = reinterpret_cast<GuiCallbackContext*>(ctx->data);
+  if (gui->plugin == nullptr) {
+    return;
+  }
   uint64_t frameStart = uv_hrtime();
   uint64_t frameLatency = frameStart - gui->frameLast;
-  *(gui->guiQuitRequested) = (pollGUI(gui->window, gui->callback) == false);
+  *(gui->guiQuitRequested) = (gui->plugin->pollGUI(gui->window, gui->callback) == false);
   uint64_t frameEnd = uv_hrtime();
   *(gui->frameCost) = (frameEnd - frameStart) / 1000000;
   *(gui->frameLatency) = frameLatency / 1000000;
@@ -892,12 +911,39 @@ int runStateMachine(DataProcessorSpecs const& workflow,
 
   auto resourceManager = std::make_unique<SimpleResourceManager>(resources);
 
+  DebugGUI* debugGUI = nullptr;
   void* window = nullptr;
-  decltype(gui::getGUIDebugger(infos, deviceSpecs, dataProcessorInfos, metricsInfos, driverInfo, controls, driverControl)) debugGUICallback;
+  decltype(debugGUI->getGUIDebugger(infos, deviceSpecs, dataProcessorInfos, metricsInfos, driverInfo, controls, driverControl)) debugGUICallback;
 
   // An empty frameworkId means this is the driver, so we initialise the GUI
   if (driverInfo.batch == false && frameworkId.empty()) {
-    window = initGUI("O2 Framework debug GUI");
+    auto initDebugGUI = []() -> DebugGUI* {
+      uv_lib_t supportLib;
+      int result = 0;
+  #ifdef __APPLE__
+      result = uv_dlopen("libO2FrameworkGUISupport.dylib", &supportLib);
+  #else
+      result = uv_dlopen("libO2FrameworkGUISupport.so", &supportLib);
+  #endif
+      if (result == -1) {
+        LOG(ERROR) << uv_dlerror(&supportLib);
+        return nullptr;
+      }
+      void* callback = nullptr;
+      DPLPluginHandle* (*dpl_plugin_callback)(DPLPluginHandle*);
+
+      result = uv_dlsym(&supportLib, "dpl_plugin_callback", (void**)&dpl_plugin_callback);
+      if (result == -1) {
+        LOG(ERROR) << uv_dlerror(&supportLib);
+        return nullptr;
+      }
+      DPLPluginHandle* pluginInstance = dpl_plugin_callback(nullptr);
+      return PluginManager::getByName<DebugGUI>(pluginInstance, "ImGUIDebugGUI");
+    };
+    debugGUI = initDebugGUI();
+    if (debugGUI) {
+      window = debugGUI->initGUI("O2 Framework debug GUI");
+    }
   }
   if (driverInfo.batch == false && window == nullptr && frameworkId.empty()) {
     LOG(WARN) << "Could not create GUI. Switching to batch mode. Do you have GLFW on your system?";
@@ -920,6 +966,7 @@ int runStateMachine(DataProcessorSpecs const& workflow,
   }
 
   GuiCallbackContext guiContext;
+  guiContext.plugin = debugGUI;
   guiContext.frameLast = uv_hrtime();
   guiContext.frameLatency = &driverInfo.frameLatency;
   guiContext.frameCost = &driverInfo.frameCost;
@@ -1125,30 +1172,42 @@ int runStateMachine(DataProcessorSpecs const& workflow,
         // because getGUIDebugger actually recreates the GUI state.
         if (window) {
           uv_timer_stop(&gui_timer);
-          guiContext.callback = gui::getGUIDebugger(infos, deviceSpecs, dataProcessorInfos, metricsInfos, driverInfo, controls, driverControl);
+          guiContext.callback = debugGUI->getGUIDebugger(infos, deviceSpecs, dataProcessorInfos, metricsInfos, driverInfo, controls, driverControl);
           guiContext.window = window;
           gui_timer.data = &guiContext;
           uv_timer_start(&gui_timer, gui_callback, 0, 20);
           guiDeployedOnce = true;
         }
         break;
+      case DriverState::MERGE_CONFIGS: {
+        try {
+          controls.resize(deviceSpecs.size());
+          deviceExecutions.resize(deviceSpecs.size());
+
+          DeviceSpecHelpers::reworkShmSegmentSize(dataProcessorInfos);
+          DeviceSpecHelpers::prepareArguments(driverControl.defaultQuiet,
+                                              driverControl.defaultStopped,
+                                              dataProcessorInfos,
+                                              deviceSpecs,
+                                              deviceExecutions, controls,
+                                              driverInfo.uniqueWorkflowId);
+        } catch (o2::framework::RuntimeErrorRef& ref) {
+          auto& err = o2::framework::error_from_ref(ref);
+          LOG(ERROR) << "Unable to merge configurations: " << err.what;
+#ifdef DPL_ENABLE_BACKTRACE
+          std::cerr << "\nStacktrace follows:\n\n";
+          backtrace_symbols_fd(err.backtrace, err.maxBacktrace, STDERR_FILENO);
+#endif
+          return 1;
+        }
+
+      } break;
       case DriverState::SCHEDULE: {
         // FIXME: for the moment modifying the topology means we rebuild completely
         //        all the devices and we restart them. This is also what DDS does at
         //        a larger scale. In principle one could try to do a delta and only
         //        restart the data processors which need to be restarted.
         LOG(INFO) << "Redeployment of configuration asked.";
-        controls.resize(deviceSpecs.size());
-        deviceExecutions.resize(deviceSpecs.size());
-
-        DeviceSpecHelpers::reworkShmSegmentSize(dataProcessorInfos);
-        DeviceSpecHelpers::prepareArguments(driverControl.defaultQuiet,
-                                            driverControl.defaultStopped,
-                                            dataProcessorInfos,
-                                            deviceSpecs,
-                                            deviceExecutions, controls,
-                                            driverInfo.uniqueWorkflowId);
-
         std::ostringstream forwardedStdin;
         WorkflowSerializationHelpers::dump(forwardedStdin, workflow, dataProcessorInfos);
         infos.reserve(deviceSpecs.size());
@@ -1208,6 +1267,7 @@ int runStateMachine(DataProcessorSpecs const& workflow,
           driverInfo.states.push_back(DriverState::RUNNING);
           driverInfo.states.push_back(DriverState::REDEPLOY_GUI);
           driverInfo.states.push_back(DriverState::SCHEDULE);
+          driverInfo.states.push_back(DriverState::MERGE_CONFIGS);
         } else if (deviceSpecs.empty() && driverInfo.batch == true) {
           LOG(INFO) << "No device resulting from the workflow. Quitting.";
           // If there are no deviceSpecs, we exit.
@@ -1299,8 +1359,7 @@ int runStateMachine(DataProcessorSpecs const& workflow,
           performanceMetrics.push_back("arrow-bytes-delta");
           performanceMetrics.push_back("aod-bytes-read-uncompressed");
           performanceMetrics.push_back("aod-bytes-read-compressed");
-          performanceMetrics.push_back("aod-total-read-calls");
-          performanceMetrics.push_back("aod-file-read-path");
+          performanceMetrics.push_back("aod-file-read-info");
           ResourcesMonitoringHelper::dumpMetricsToJSON(metricsInfos, driverInfo.metrics, deviceSpecs, performanceMetrics);
         }
         // This is a clean exit. Before we do so, if required,
@@ -1518,6 +1577,7 @@ void initialiseDriverControl(bpo::variables_map const& varmap,
     control.forcedTransitions = {
       DriverState::EXIT,                    //
       DriverState::PERFORM_CALLBACKS,       //
+      DriverState::MERGE_CONFIGS,           //
       DriverState::IMPORT_CURRENT_WORKFLOW, //
       DriverState::MATERIALISE_WORKFLOW     //
     };
@@ -1536,6 +1596,7 @@ void initialiseDriverControl(bpo::variables_map const& varmap,
       DriverState::EXIT,                    //
       DriverState::PERFORM_CALLBACKS,       //
       DriverState::SCHEDULE,                //
+      DriverState::MERGE_CONFIGS,           //
       DriverState::IMPORT_CURRENT_WORKFLOW, //
       DriverState::MATERIALISE_WORKFLOW     //
     };
@@ -1550,6 +1611,7 @@ void initialiseDriverControl(bpo::variables_map const& varmap,
       DriverState::EXIT,                    //
       DriverState::PERFORM_CALLBACKS,       //
       DriverState::SCHEDULE,                //
+      DriverState::MERGE_CONFIGS,           //
       DriverState::IMPORT_CURRENT_WORKFLOW, //
       DriverState::MATERIALISE_WORKFLOW     //
     };
@@ -1560,6 +1622,7 @@ void initialiseDriverControl(bpo::variables_map const& varmap,
     //        it's own configuration by the driver.
     control.forcedTransitions = {
       DriverState::DO_CHILD,                //
+      DriverState::MERGE_CONFIGS,           //
       DriverState::IMPORT_CURRENT_WORKFLOW, //
       DriverState::MATERIALISE_WORKFLOW     //
     };
@@ -1580,6 +1643,7 @@ void initialiseDriverControl(bpo::variables_map const& varmap,
     control.forcedTransitions = {
       DriverState::EXIT,                    //
       DriverState::PERFORM_CALLBACKS,       //
+      DriverState::MERGE_CONFIGS,           //
       DriverState::IMPORT_CURRENT_WORKFLOW, //
       DriverState::MATERIALISE_WORKFLOW     //
     };

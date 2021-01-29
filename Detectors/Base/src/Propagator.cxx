@@ -29,8 +29,11 @@ using namespace o2::gpu;
 #include <FairRunAna.h> // eventually will get rid of it
 #include <TGeoGlobalMagField.h>
 
-Propagator::Propagator()
+Propagator::Propagator(bool uninitialized)
 {
+  if (uninitialized) {
+    return;
+  }
   ///< construct checking if needed components were initialized
 
   // we need the geoemtry loaded
@@ -98,7 +101,10 @@ int Propagator::initFieldFromGRP(const o2::parameters::GRPObject* grp, bool verb
   }
   return 0;
 }
-
+#elif !defined(GPUCA_GPUCODE)
+Propagator::Propagator(bool uninitialized)
+{
+} // empty dummy constructor for standalone benchmark
 #endif
 
 //_______________________________________________________________________
@@ -516,7 +522,7 @@ GPUd() bool Propagator::propagateToDCABxByBz(const math_utils::Point3D<float>& v
 GPUd() MatBudget Propagator::getMatBudget(Propagator::MatCorrType corrType, const math_utils::Point3D<float>& p0, const math_utils::Point3D<float>& p1) const
 {
 #if !defined(GPUCA_STANDALONE) && !defined(GPUCA_GPUCODE)
-  if (corrType == MatCorrType::USEMatCorrTGeo) {
+  if (corrType == MatCorrType::USEMatCorrTGeo || !mMatLUT) {
     return GeometryManager::meanMaterialBudget(p0, p1);
   }
 #endif

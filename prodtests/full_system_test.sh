@@ -61,11 +61,14 @@ mkdir -p raw
 taskwrapper itsraw.log o2-its-digi2raw --file-for link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -o raw/ITS
 taskwrapper mftraw.log o2-mft-digi2raw --file-for link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -o raw/MFT
 taskwrapper ft0raw.log o2-ft0-digi2raw --file-per-link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -o raw/FT0
+taskwrapper fv0raw.log o2-fv0-digi2raw --file-per-link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -o raw/FV0
+taskwrapper fddraw.log o2-fdd-digit2raw --file-per-link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -o raw/FDD
 taskwrapper tpcraw.log o2-tpc-digits-to-rawzs  --file-for link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -i tpcdigits.root -o raw/TPC
 taskwrapper tofraw.log o2-tof-reco-workflow ${GLOBALDPLOPT} --tof-raw-file-for link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' --output-type raw --tof-raw-outdir raw/TOF
 taskwrapper midraw.log o2-mid-digits-to-raw-workflow ${GLOBALDPLOPT} --mid-raw-outdir raw/MID --mid-raw-perlink  --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"'
 taskwrapper emcraw.log o2-emcal-rawcreator --file-for link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -o raw/EMC
 taskwrapper phsraw.log o2-phos-digi2raw  --file-for link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -o raw/PHS
+taskwrapper cpvraw.log o2-cpv-digi2raw  --file-for link --configKeyValues '"HBFUtils.nHBFPerTF=128;HBFUtils.orbitFirst=0"' -o raw/CPV
 cat raw/*/*.cfg > rawAll.cfg
 
 # We run the workflow in both CPU-only and With-GPU mode
@@ -75,6 +78,7 @@ if [ $ENABLE_GPU_TEST != "0" ]; then
 fi
 STAGES+=" ASYNC"
 for STAGE in $STAGES; do
+  logfile=reco_${STAGE}.log
 
   ARGS_ALL="--session default"
   DICTCREATION=""
@@ -87,7 +91,7 @@ for STAGE in $STAGES; do
     export CTFINPUT=0
     export SAVECTF=0
   elif [[ "$STAGE" = "ASYNC" ]]; then
-    export CREATECTFDICT=1
+    export CREATECTFDICT=0
     export GPUTYPE=CPU
     export SYNCMODE=0
     export HOSTMEMSIZE=$TPCTRACKERSCRATCHMEMORY
@@ -100,14 +104,14 @@ for STAGE in $STAGES; do
     export HOSTMEMSIZE=$TPCTRACKERSCRATCHMEMORY
     export CTFINPUT=0
     export SAVECTF=1
-    rm -f ctf_dictionary.root
+    JOBUTILS_JOB_SKIPCREATEDONE=1 taskwrapper ${logfile} "rm -f ctf_dictionary.root"
+    unset JOBUTILS_JOB_SKIPCREATEDONE
   fi
   export SHMSIZE
   export NTIMEFRAMES
   export TFDELAY
   export GLOBALDPLOPT
 
-  logfile=reco_${STAGE}.log
   taskwrapper ${logfile} "$O2_ROOT/prodtests/full-system-test/dpl-workflow.sh"
 
   # --- record interesting metrics to monitor ----

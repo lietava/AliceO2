@@ -24,7 +24,7 @@ o2_cleanup_shm_files() {
   which lsof &> /dev/null
   if [ "$?" = "0" ]; then
     # find shared memory files **CURRENTLY IN USE** by FairMQ
-    USEDFILES=`lsof -u $(whoami) | grep -e \"/dev/shm/.*fmq\" | sed 's/.*\/dev/\/dev/g' | sort | uniq | tr '\n' ' '`
+    USEDFILES=`lsof -u $(whoami) 2> /dev/null | grep -e \"/dev/shm/.*fmq\" | sed 's/.*\/dev/\/dev/g' | sort | uniq | tr '\n' ' '`
 
     echo "${USEDFILES}"
     if [ ! "${USEDFILES}" ]; then
@@ -46,10 +46,12 @@ o2_cleanup_shm_files() {
 }
 
 # Function to find out all the (recursive) child processes starting from a parent PID.
-# The output includes includes the parent
-# output is saved in child_pid_list
+# The output includes the parent
 childprocs() {
   local parent=$1
+  if [ ! "$2" ]; then
+    child_pid_list=""
+  fi
   if [ "$parent" ] ; then
     child_pid_list="$child_pid_list $parent"
     for childpid in $(pgrep -P ${parent}); do
@@ -146,7 +148,7 @@ taskwrapper() {
     finalcommand="TIME=\"#walltime %e\" ${O2_ROOT}/share/scripts/monitor-mem.sh ${TIMECOMMAND} './${SCRIPTNAME}'"
   fi
   echo "Running: ${finalcommand}" > ${logfile}
-  eval ${finalcommand} >> ${logfile} 2>&1 & disown
+  eval ${finalcommand} >> ${logfile} 2>&1 & #can't disown here since we want to retrieve exit status later on
 
   # THE NEXT PART IS THE SUPERVISION PART
   # get the PID
@@ -156,9 +158,11 @@ taskwrapper() {
   trap "taskwrapper_cleanup_handler ${PID} SIGTERM" SIGTERM
 
   cpucounter=1
+  inactivitycounter=0   # used to detect periods of inactivity
   NLOGICALCPUS=$(getNumberOfLogicalCPUCores)
 
   reduction_factor=1
+  control_iteration=1
   while [ 1 ]; do
     # We don't like to see critical problems in the log file.
 
@@ -202,6 +206,7 @@ taskwrapper() {
 
       RC_ACUM=$((RC_ACUM+1))
       [ ! "${JOBUTILS_KEEPJOBSCRIPT}" ] && rm ${SCRIPTNAME} 2> /dev/null
+      [[ ! "${JOBUTILS_NOEXIT_ON_ERROR}" ]] && [[ ! $- == *i* ]] && exit 1
       return 1
     fi
 
@@ -258,29 +263,51 @@ taskwrapper() {
       # And take corrective actions if we extend by 10%
       limitPIDs=""
       unset waslimited
-      if (( $(echo "${totalCPU_unlimited} > 1.1*${JOBUTILS_LIMITLOAD}" | bc -l) )); then
-        # we reduce each pid proportionally for the time until the next check and record the reduction factor in place
-        oldreduction=${reduction_factor}
-        reduction_factor=$(awk -v limit="${JOBUTILS_LIMITLOAD}" -v cur="${totalCPU_unlimited}" 'BEGIN{ print limit/cur;}')
-        echo "APPLYING REDUCTION = ${reduction_factor}"
+      if [ ${JOBUTILS_LIMITLOAD} ]; then
+        if (( $(echo "${totalCPU_unlimited} > 1.1*${JOBUTILS_LIMITLOAD}" | bc -l) )); then
+          # we reduce each pid proportionally for the time until the next check and record the reduction factor in place
+          oldreduction=${reduction_factor}
+          reduction_factor=$(awk -v limit="${JOBUTILS_LIMITLOAD}" -v cur="${totalCPU_unlimited}" 'BEGIN{ print limit/cur;}')
+          echo "APPLYING REDUCTION = ${reduction_factor}"
 
-        for p in $childpids; do
-          cpulim=$(awk -v a="${thisCPU[${p}]}" -v newr="${reduction_factor}" -v oldr="${oldreduction}" 'BEGIN { r=(a/oldr)*newr; print r; if(r > 0.05) {exit 0;} exit 1; }')
-          if [ $? = "0" ]; then
-            # we only apply to jobs above a certain threshold
-            echo "Setting CPU lim for job ${p} / ${name[$p]} to ${cpulim}";
+          for p in $childpids; do
+            cpulim=$(awk -v a="${thisCPU[${p}]}" -v newr="${reduction_factor}" -v oldr="${oldreduction}" 'BEGIN { r=(a/oldr)*newr; print r; if(r > 0.05) {exit 0;} exit 1; }')
+            if [ $? = "0" ]; then
+              # we only apply to jobs above a certain threshold
+              echo "Setting CPU lim for job ${p} / ${name[$p]} to ${cpulim}";
 
-            timeout ${JOBUTILS_WRAPPER_SLEEP} ${O2_ROOT}/share/scripts/cpulimit -l ${cpulim} -p ${p} > /dev/null 2> /dev/null & disown
-            proc=$!
-            limitPIDs="${limitPIDs} ${proc}"
-            waslimited[$p]=1
-          fi
-        done
-      else
-        echo "RESETING REDUCTION = 1"
-        reduction_factor=1.
+              timeout ${JOBUTILS_WRAPPER_SLEEP} ${O2_ROOT}/share/scripts/cpulimit -l ${cpulim} -p ${p} > /dev/null 2> /dev/null & disown
+              proc=$!
+              limitPIDs="${limitPIDs} ${proc}"
+              waslimited[$p]=1
+            fi
+          done
+        else
+          # echo "RESETING REDUCTION = 1"
+          reduction_factor=1.
+        fi
       fi
+
       let cpucounter=cpucounter+1
+      # our condition for inactive
+      if (( $(echo "${totalCPU} < 5" | bc -l) )); then
+        let inactivitycounter=inactivitycounter+JOBUTILS_WRAPPER_SLEEP
+      else
+        inactivitycounter=0
+      fi
+      if [ "${JOBUTILS_JOB_KILLINACTIVE}" ]; then
+        $(awk -v I="${inactivitycounter}" -v T="${JOBUTILS_JOB_KILLINACTIVE}" 'BEGIN {if(I>T){exit 1;} exit 0;}')
+        if [ "$?" = "1" ]; then
+          echo "task inactivity limit reached .. killing all processes";
+          taskwrapper_cleanup $PID SIGKILL
+          # call a more specialized hook for this??
+          if [ "${JOBUTILS_JOB_FAILUREHOOK}" ]; then
+            hook="${JOBUTILS_JOB_FAILUREHOOK} '$command' $logfile"
+            eval "${hook}"
+          fi
+          return 1
+        fi
+      fi
     fi
 
     # a good moment to check for jobs timeout (or other resources)
@@ -299,7 +326,19 @@ taskwrapper() {
     fi
 
     # sleep for some time (can be customized for power user)
-    sleep ${JOBUTILS_WRAPPER_SLEEP:-10}
+    sleep ${JOBUTILS_WRAPPER_SLEEP:-1}
+
+    # power feature: we allow to call a user hook at each i-th control
+    # iteration
+    if [ "${JOBUTILS_JOB_PERIODICCONTROLHOOK}" ]; then
+      if [ "${control_iteration}" = "${JOBUTILS_JOB_CONTROLITERS:-10}" ]; then
+        hook="${JOBUTILS_JOB_PERIODICCONTROLHOOK} '$command' $logfile"
+        eval "${hook}"
+        control_iteration=0
+      fi
+    fi
+
+    let control_iteration=control_iteration+1
   done
 
   # wait for PID and fetch return code
@@ -309,10 +348,12 @@ taskwrapper() {
   RC=$?
   RC_ACUM=$((RC_ACUM+RC))
   if [ "${RC}" -eq "0" ]; then
-    # if return code 0 we mark this task as done
-    echo "Command \"${command}\" successfully finished." > "${logfile}"_done
-    echo "The presence of this file can be used to skip this command in future runs" >> "${logfile}"_done
-    echo "of the pipeline by setting the JOBUTILS_SKIPDONE environment variable." >> "${logfile}"_done
+    if [ ! "${JOBUTILS_JOB_SKIPCREATEDONE}" ]; then
+      # if return code 0 we mark this task as done
+      echo "Command \"${command}\" successfully finished." > "${logfile}"_done
+      echo "The presence of this file can be used to skip this command in future runs" >> "${logfile}"_done
+      echo "of the pipeline by setting the JOBUTILS_SKIPDONE environment variable." >> "${logfile}"_done
+    fi
   else
     echo "command ${command} had nonzero exit code ${RC}"
   fi
@@ -334,6 +375,12 @@ taskwrapper() {
     eval "${hook}"
   fi
 
+  if [ ! "${RC}" -eq "0" ]; then
+    if [ ! "${JOBUTILS_NOEXIT_ON_ERROR}" ]; then
+      # in case of incorrect termination, we usually like to stop the whole outer script (== we are in non-interactive mode)
+      [[ ! $- == *i* ]] && exit ${RC}
+    fi
+  fi
   return ${RC}
 }
 
