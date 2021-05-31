@@ -88,9 +88,10 @@ class CTPConfiguration
   void addCTPCluster(const CTPCluster& cluster);
   void addCTPClass(const CTPClass& ctpclass);
   void printStream(std::ostream& stream) const;
-  std::vector<CTPInput>& getCTPInputs(){return mInputs;}
+  std::vector<CTPInput>& getCTPInputs() { return mInputs; }
   uint64_t getInputMask(const std::string& name);
   bool isMaskInInputs(uint64_t& mask);
+
  private:
   std::string mName;
   std::string mVersion;
