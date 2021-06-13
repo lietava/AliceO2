@@ -10,6 +10,8 @@
 
 o2_add_library(CTPWorkflow
                SOURCES src/CTPDigitWriterSpec.cxx
+                       src/ReaderSpec.cxx
+                       src/WriterSpec.cxx
                PUBLIC_LINK_LIBRARIES O2::Framework
                                      O2::DataFormatsCTP
                                      O2::DPLUtils)
