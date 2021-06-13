@@ -31,7 +31,6 @@ void RawToDigitConverterSpec::run(framework::ProcessingContext& ctx)
   int firstEntry = 0;
   mOutputHWErrors.clear();
 
-
   for (const auto& rawData : framework::InputRecordWalker(ctx.inputs())) {
     o2::ctp::RawReaderMemory rawreader(o2::framework::DataRefUtils::as<const char>(rawData));
     // loop over all the DMA pages

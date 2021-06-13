@@ -30,7 +30,6 @@ using DigitType = std::vector<o2::ctp::CTPDigit>;
 using MCLabelType = o2::dataformats::MCTruthContainer<MCCompLabel>;
 using namespace o2::header;
 
-
 DataProcessorSpec getDigitWriterSpec(bool useMC)
 {
   // Spectators for logging
@@ -57,5 +56,5 @@ DataProcessorSpec getDigitWriterSpec(bool useMC)
   }
 }
 
-} // namespace cpv
+} // namespace ctp
 } // namespace o2

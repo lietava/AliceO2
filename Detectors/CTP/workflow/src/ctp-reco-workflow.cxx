@@ -21,9 +21,10 @@ include "Framework/WorkflowSpec.h"
 #include <stdexcept>
 #include <unordered_map>
 
-// add workflow options, note that customization needs to be declared before
-// including Framework/runDataProcessing
-void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
+  // add workflow options, note that customization needs to be declared before
+  // including Framework/runDataProcessing
+  void
+  customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
 {
   std::vector<o2::framework::ConfigParamSpec> options{
     {"input-type", o2::framework::VariantType::String, "digits", {"hits, digits, raw, clusters"}},

@@ -61,7 +61,7 @@ DataProcessorSpec getDigitsReaderSpec(bool propagateMC)
                                                                      publishingMode,
                                                                      Output{"CTP", "DIGITS", subSpec, persistency},
                                                                      "CTPDigit", // name of data branch
-                                                                     Output{"CTP", "DIGITSMCTR", subSpec, persistency},"CPVDigitMCTruth"); 
+                                                                     Output{"CTP", "DIGITSMCTR", subSpec, persistency}, "CPVDigitMCTruth");
       } else {
         processAttributes->reader = std::make_shared<RootTreeReader>(treename.c_str(), // tree name
                                                                      filename.c_str(), // input file name
@@ -80,10 +80,10 @@ DataProcessorSpec getDigitsReaderSpec(bool propagateMC)
       auto publish = [&processAttributes, &pc, propagateMC]() {
         //o2::cpv::CPVBlockHeader cpvheader(true);
         //if (processAttributes->reader->next()) {
-          //(*processAttributes->reader)(pc, cpvheader);
+        //(*processAttributes->reader)(pc, cpvheader);
         //} else {
-          //processAttributes->reader.reset();
-          //return false;
+        //processAttributes->reader.reset();
+        //return false;
         //}
         return true;
       };
@@ -96,7 +96,7 @@ DataProcessorSpec getDigitsReaderSpec(bool propagateMC)
         //pc.outputs().snapshot(OutputRef{"output", 0, {dummyheader}}, 0);
         //pc.outputs().snapshot(OutputRef{"outputTR", 0, {dummyheader}}, 0);
         //if (propagateMC) {
-          //pc.outputs().snapshot(OutputRef{"outputMC", 0, {dummyheader}}, 0);
+        //pc.outputs().snapshot(OutputRef{"outputMC", 0, {dummyheader}}, 0);
         //}
       }
       if ((processAttributes->finished = (active == false)) && processAttributes->terminateOnEod) {

@@ -66,6 +66,6 @@ o2::framework::DataProcessorSpec getRawToDigitConverterSpec();
 
 } // namespace reco_workflow
 
-} // namespace cpv
+} // namespace ctp
 
 } // namespace o2
