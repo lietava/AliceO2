@@ -166,6 +166,7 @@ class CTPRunManager
   // void setCCDBPathConfig(std::string path) { mCCDBPathCTPConfig = path;};
   void setCCDBPathScalers(std::string path) { mCCDBPathCTPScalers = path; };
   void printCounters();
+
  private:
   /// Database constants
   //td::string mCcdbHost = "http://ccdb-test.cern.ch:8080";
