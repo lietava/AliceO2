@@ -32,7 +32,7 @@ void GetScalers(long tmin = 0, long tmax = -1, std::string ccdbHost = "http://cc
   //std::string srun = "518462";
   std::string srun = "77781";
   std::map<std::string, std::string> metadata;
-  metadata["runNumber"]=srun;
+  metadata["runNumber"] = srun;
   //auto hd = cdb.retrieveHeaders("RCT/Info/RunInformation", {}, runNumber);
   //auto hd = cdb.retrieveHeaders("RCT/Info/RunInformation", metadata);
   //std::cout << stol(hd["SOR"]) << "\n";
@@ -40,11 +40,11 @@ void GetScalers(long tmin = 0, long tmax = -1, std::string ccdbHost = "http://cc
   CTPRunScalers scl;
   CTPRunManager mng;
   //mng.setCCDBPathScalers("CTP/Scalers");
-  scl = mng.getScalersFromCCDB(-1,srun);
+  scl = mng.getScalersFromCCDB(-1, srun);
   scl.convertRawToO2();
   scl.printStream(std::cout);
   scl.printRates();
-  ctpcfg = mng.getConfigFromCCDB(-1,srun);
+  ctpcfg = mng.getConfigFromCCDB(-1, srun);
   //std::vector<int> clsses;
   //clsses = ctpcfg.getTriggerClassList();
   //std::cout << clsses.size() << std::endl;
