@@ -120,7 +120,7 @@ void AODProducerWorkflowDPL::createCTPReadout(const o2::globaltracking::RecoCont
   for (auto& trdrec : triggerrecordTRD) {
     uint64_t globalBC = trdrec.getBCData().toLong();
     bcsMapTRDreadout[globalBC] = 1;
-    if(bcsMapT0triggers.count(globalBC) > 0) {
+    if (bcsMapT0triggers.count(globalBC) > 0) {
       o2::ctp::CTPDigit ctpdig;
       ctpdig.intRecord.setFromLong(globalBC);
       ctpdig.CTPClassMask = bcsMapT0triggers[globalBC];
@@ -1252,7 +1252,7 @@ void AODProducerWorkflowDPL::run(ProcessingContext& pc)
   auto ctpDigits = recoData.getCTPDigits();
   const auto& tinfo = pc.services().get<o2::framework::TimingInfo>();
 
-  if(mCTPReadout == 1) {
+  if (mCTPReadout == 1) {
     std::vector<o2::ctp::CTPDigit> ctpDigitsCreated;
     createCTPReadout(recoData, ctpDigitsCreated, tinfo.runNumber);
     ctpDigits = ctpDigitsCreated;

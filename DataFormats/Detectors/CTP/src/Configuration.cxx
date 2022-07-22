@@ -338,7 +338,7 @@ int CTPConfiguration::processConfigurationLineRun3(std::string& line, int& level
           desc.name = token;
           mDescriptors.push_back(desc);
           cls.descriptorIndex = mDescriptors.size() - 1;
-          LOG(info) << "Class generator found:" << desc.name ;
+          LOG(info) << "Class generator found:" << desc.name;
         } else if (token.find("~") != std::string::npos) { // inverted input
           //std::cout << "Inverted input" << std::endl;
           std::string sinp = token.substr(1, token.size() - 1);
@@ -433,7 +433,7 @@ uint64_t CTPConfiguration::getInputMask(const std::string& name) const
 int CTPConfiguration::getInputIndex(const std::string& name) const
 {
   const CTPInput* inp = isInputInConfig(name);
-  if(inp == nullptr) {
+  if (inp == nullptr) {
     return 0xff;
   } else {
     return inp->getIndex();
@@ -459,7 +459,7 @@ bool CTPConfiguration::isBCMaskInConfig(const std::string maskname) const
 }
 const CTPInput* CTPConfiguration::isInputInConfig(const std::string inpname) const
 {
-  for ( const auto &inp : mInputs) {
+  for (const auto& inp : mInputs) {
     if (inp.name == inpname) {
       return &inp;
     }
@@ -468,7 +468,7 @@ const CTPInput* CTPConfiguration::isInputInConfig(const std::string inpname) con
 }
 const CTPInput* CTPConfiguration::isInputInConfig(const int index) const
 {
-  for ( const auto &inp : mInputs) {
+  for (const auto& inp : mInputs) {
     //std::cout << "isInputINConfig:" << inp.name << " " << inp.getIndex() << " " << index << std::endl;
     if (inp.getIndex() == index) {
       LOG(info) << "Found input:" << inp.name << " index:" << inp.getIndex();

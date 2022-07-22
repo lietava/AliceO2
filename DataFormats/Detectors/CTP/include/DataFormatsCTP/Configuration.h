@@ -155,6 +155,7 @@ class CTPConfiguration
   void createDefaultInputsConfig();
   uint64_t getClassMaskForInput(int inputindex) const;
   uint64_t getClassMaskForInput(const std::string& name) const;
+
  private:
   std::string mConfigString = "";
   uint32_t mRunNumber = 0;
