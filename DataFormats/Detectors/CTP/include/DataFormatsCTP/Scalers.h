@@ -31,7 +31,7 @@ namespace ctp
 struct errorCounters {
   errorCounters() = default;
   void printStream(std::ostream& stream) const;
-  uint32_t lmB = 0,l0B = 0,l1B = 0,lmA = 0,l0A = 0,l1A = 0;  // decreasing counters
+  uint32_t lmB = 0, l0B = 0, l1B = 0, lmA = 0, l0A = 0, l1A = 0;       // decreasing counters
   uint32_t lmBlmA = 0, lmAl0B = 0, l0Bl0A = 0, l0Al1B = 0, l1Bl1A = 0; // between levels countres
   uint32_t MAXPRINT = 3;
 };
