@@ -108,7 +108,7 @@ void digi2raw(const std::string& inpName, const std::string& outDir, int verbosi
   wr.setSuperPageSize(superPageSizeInB);
   wr.useRDHVersion(rdhV);
   wr.setDontFillEmptyHBF(noEmptyHBF);
-  if(rdhV < 7 && !enablePadding) {
+  if (rdhV < 7 && !enablePadding) {
     enablePadding = true;
     LOG(info) << "padding is always ON for RDH version " << rdhV;
   }
@@ -127,7 +127,7 @@ void digi2raw(const std::string& inpName, const std::string& outDir, int verbosi
   m2r.setOutDir(outDirName);
   m2r.setZeroSuppressedIntRec(zsIR);
   m2r.setZeroSuppressedClassRec(zsClass);
-  //m2r.getWriter().useRDHDataFormat(enablePadding ? 0 : 2);
+  // m2r.getWriter().useRDHDataFormat(enablePadding ? 0 : 2);
   m2r.setPadding(enablePadding);
   m2r.init();
   m2r.processDigits(inpName);
