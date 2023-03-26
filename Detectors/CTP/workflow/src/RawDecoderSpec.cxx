@@ -147,10 +147,9 @@ void RawDecoderSpec::run(framework::ProcessingContext& ctx)
     }
     if (payload.size()) {
       LOG(info) << "payload size:" << payload.size();
-      //LOG(info) << "RDH FEEid: " << feeID << " CTP CRU link:" << linkCRU << " Orbit:" << triggerOrbit << " stopbit:" << stopBit << " packet:" << packetCounter;
-      //LOGP(info, "RDH FEEid: {} CRU link: {}, Orbit: {}", feeID, linkCRU, triggerOrbit);
+      // LOG(info) << "RDH FEEid: " << feeID << " CTP CRU link:" << linkCRU << " Orbit:" << triggerOrbit << " stopbit:" << stopBit << " packet:" << packetCounter;
+      // LOGP(info, "RDH FEEid: {} CRU link: {}, Orbit: {}", feeID, linkCRU, triggerOrbit);
       std::cout << std::hex << "RDH FEEid: " << feeID << " CTP CRU link:" << linkCRU << " Orbit:" << triggerOrbit << std::endl;
-
     }
     gbtword80_t bcmask = std::bitset<80>("111111111111");
     for (auto payloadWord : payload) {
@@ -160,11 +159,13 @@ void RawDecoderSpec::run(framework::ProcessingContext& ctx)
         if (gbtWord80.count() != 80) {
           gbtwords80.push_back(gbtWord80);
           uint64_t bcid = (gbtWord80 & bcmask).to_ullong();
-          if(bcid < 279) bcid += 3564-279;
-          else bcid += -279;
-          std::string ss = fmt::format("{:x}",bcid);
+          if (bcid < 279)
+            bcid += 3564 - 279;
+          else
+            bcid += -279;
+          std::string ss = fmt::format("{:x}", bcid);
           LOG(info) << "w80:" << gbtWord80 << " " << ss;
-          //LOGP(info,"w80: {} bcid:{%x}", gbtWord80,bcid);
+          // LOGP(info,"w80: {} bcid:{%x}", gbtWord80,bcid);
         }
         gbtWord80.set();
       }
