@@ -92,9 +92,9 @@ void RawDecoderSpec::run(framework::ProcessingContext& ctx)
   //
   std::vector<LumiInfo> lumiPointsHBF1;
   int ret = decodeRaw(inputs, digits, lumiPointsHBF1);
-  if(ret == 1) {
+  if (ret == 1) {
     dummyOutput();
-    return ;
+    return;
   }
   if (mDoDigits) {
     for (auto const digmap : digits) {
@@ -234,7 +234,7 @@ int RawDecoderSpec::addCTPDigit(uint32_t linkCRU, uint32_t orbit, gbtword80_t& d
   }
   return 0;
 }
-int RawDecoderSpec::decodeRaw(o2::framework::InputRecord& inputs,std::map<o2::InteractionRecord, CTPDigit>& digits, std::vector<LumiInfo>& lumiPointsHBF1)
+int RawDecoderSpec::decodeRaw(o2::framework::InputRecord& inputs, std::map<o2::InteractionRecord, CTPDigit>& digits, std::vector<LumiInfo>& lumiPointsHBF1)
 {
   uint64_t countsMBT = 0;
   uint64_t countsMBV = 0;
@@ -256,7 +256,7 @@ int RawDecoderSpec::decodeRaw(o2::framework::InputRecord& inputs,std::map<o2::In
       mPadding = (o2::raw::RDHUtils::getDataFormat(rdh) == 0);
     } catch (std::exception& e) {
       LOG(error) << "Failed to extract RDH, abandoning TF sending dummy output, exception was: " << e.what();
-      //dummyOutput();
+      // dummyOutput();
       return 1;
     }
     // auto triggerOrbit = o2::raw::RDHUtils::getTriggerOrbit(rdh);
@@ -405,7 +405,7 @@ int RawDecoderSpec::decodeRaw(o2::framework::InputRecord& inputs,std::map<o2::In
     }
   }
   if (mDoLumi) {
-  lumiPointsHBF1.emplace_back(LumiInfo{orbit0, 0, 0, countsMBT, countsMBV});
+    lumiPointsHBF1.emplace_back(LumiInfo{orbit0, 0, 0, countsMBT, countsMBV});
   }
   return 0;
 }
