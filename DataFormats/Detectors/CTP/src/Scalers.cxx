@@ -150,14 +150,14 @@ std::vector<uint32_t> CTPRunScalers::getClassIndexes() const
 // cls counted from 0
 int CTPRunScalers::getScalerIndexForClass(int cls) const
 {
-  if(cls < 0 || cls >= 64) {
+  if (cls < 0 || cls >= 64) {
     LOG(error) << "Class index out of range:" << cls;
     return 255;
   }
   std::vector<uint32_t> clslist = getClassIndexes();
   int i = 0;
-  for(auto const& clsl: clslist) {
-    if(cls ==  clsl) {
+  for (auto const& clsl : clslist) {
+    if (cls == clsl) {
       return i;
     }
     i++;
@@ -579,9 +579,9 @@ int CTPRunScalers::printClassBRateAndIntegral(int icls)
   }
   double_t time0 = mScalerRecordO2[0].epochTime;
   double_t timeL = mScalerRecordO2[mScalerRecordO2.size() - 1].epochTime;
-  //if (mScalerRecordO2[0].scalers.size() < 64) {
-    //LOG(error) << "class number bigger than expected for this run:" << icls << "expexted smaller than:" << mScalerRecordO2[0].scalers.size();
-    //return 1;
+  // if (mScalerRecordO2[0].scalers.size() < 64) {
+  // LOG(error) << "class number bigger than expected for this run:" << icls << "expexted smaller than:" << mScalerRecordO2[0].scalers.size();
+  // return 1;
   //} else
   {
     int integral = mScalerRecordO2[mScalerRecordO2.size() - 1].scalers[icls - 1].lmBefore - mScalerRecordO2[0].scalers[icls - 1].lmBefore;
