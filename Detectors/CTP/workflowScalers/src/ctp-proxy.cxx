@@ -44,17 +44,17 @@
 #include <vector>
 #include <string>
 //#include <BookkeepingApi/BkpClientFactory.h>
-//using namespace o2::bkp::api;
+// using namespace o2::bkp::api;
 using namespace o2::framework;
 using DetID = o2::detectors::DetID;
 InjectorFunction dcs2dpl(std::string& ccdbhost)
 // InjectorFunction dcs2dpl()
 {
-  //auto client = BkpClientFactory::create("[host][:port]");
+  // auto client = BkpClientFactory::create("[host][:port]");
   auto runMgr = std::make_shared<o2::ctp::CTPRunManager>();
   runMgr->setCCDBHost(ccdbhost);
   runMgr->init();
-  //runMgr->setClient(client);
+  // runMgr->setClient(client);
   return [runMgr](TimingInfo&, ServiceRegistryRef const& services, fair::mq::Parts& parts, ChannelRetriever channelRetriever, size_t newTimesliceId, bool& stop) -> bool {
     // FIXME: Why isn't this function using the timeslice index?
     // make sure just 2 messages received
